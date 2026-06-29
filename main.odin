@@ -101,6 +101,27 @@ match :: proc(expected : rune,
   return true
 }
 
+string_tokenize :: proc(source : string,
+                        current : ^int,
+                        line : ^int,
+                        tokens : ^[dynamic]Token) {
+  start : int = current^
+  for peek(source, current^) != '"' && !(current^ >= len(source)) {
+    if peek(source, current^) == '\n' {
+      line^ += 1
+    }
+    current^ += 1
+  }
+  if current^ >= len(source) {
+    error(line^, "Unterminated string")
+    return
+  }
+  addToken(TokenType.STRING, tokens, start, current^-1, line^)
+  current^ += 1
+}
+//String value = source.substring(start + 1, current - 1);
+//addToken(STRING, value);
+
 scanTokens :: proc(source : string, tokens : ^[dynamic]Token) {
   current : int = 0
   start : int = 0
@@ -127,6 +148,25 @@ scanTokens :: proc(source : string, tokens : ^[dynamic]Token) {
         addToken(TokenType.LESS_EQUAL if match('=', &current, source) else TokenType.LESS, tokens, current, current+1, line)
       case '>':
         addToken(TokenType.GREATER_EQUAL if match('=', &current, source) else TokenType.GREATER, tokens, current, current+1, line)
+      case '/':
+        if match('/', &current, source) {
+          for peek(source, current) != rune('\n') && !(current >= len(source)) {
+            current += 1
+          }
+        }
+        else {
+          addToken(TokenType.SLASH, tokens, current, current+1, line)
+        }
+      case '"':
+        string_tokenize(source, &current, &line, tokens)
+        break
+      case ' ':
+      case '\r':
+      case '\t':
+        break
+      case '\n':
+        line += 1
+        break
       case:
         error(line, "Unexpected character")
         break
