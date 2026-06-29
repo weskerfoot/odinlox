@@ -119,8 +119,6 @@ string_tokenize :: proc(source : string,
   addToken(TokenType.STRING, tokens, start, current^-1, line^)
   current^ += 1
 }
-//String value = source.substring(start + 1, current - 1);
-//addToken(STRING, value);
 
 scanTokens :: proc(source : string, tokens : ^[dynamic]Token) {
   current : int = 0
