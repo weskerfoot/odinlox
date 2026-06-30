@@ -37,8 +37,8 @@ TokenType :: enum {
 }
 
 Literal :: union {
-  int,
-  string,
+  f64,
+  string
 }
 
 Token :: struct {
@@ -56,6 +56,10 @@ error :: proc(line : int, message : string) {
 report :: proc(line : int, where_from : string, message : string) {
   fmt.println("[line ", line, "] Error", where_from, ": ", message)
   hadError = true
+}
+
+isDigit :: proc(c : rune) -> bool {
+  return c >= '0' && c <= '9'
 }
 
 addToken_simple :: proc(token_type : TokenType,
@@ -88,6 +92,13 @@ peek :: proc(source : string, current : int) -> rune {
   return rune(source[current])
 }
 
+peekNext :: proc(source : string, current : int) -> rune {
+  if current + 1 >= len(source) {
+    return rune(0)
+  }
+  return rune(source[current + 1])
+}
+
 match :: proc(expected : rune,
               current : ^int,
               source : string) -> bool {
@@ -116,8 +127,33 @@ string_tokenize :: proc(source : string,
     error(line^, "Unterminated string")
     return
   }
-  addToken(TokenType.STRING, tokens, start, current^-1, line^)
+  string_lit := transmute(string)source[start:current^]
+  addToken(TokenType.STRING, tokens, start, current^, line^, string_lit)
   current^ += 1
+}
+
+number_tokenize :: proc(source : string,
+                        current : ^int,
+                        line : ^int,
+                        tokens : ^[dynamic]Token) {
+  start : int = current^
+  for isDigit(peek(source, current^)) {
+    current^ += 1
+  }
+  if peek(source, current^) == '.' && isDigit(peekNext(source, current^)) {
+    current^ += 1
+    for isDigit(peek(source, current^)) {
+      current^ += 1
+    }
+  }
+  lit_result_length : int
+  lit_result, result_ok := strconv.parse_f64(source[start-1:current^], &lit_result_length)
+  if result_ok {
+    addToken(TokenType.NUMBER, tokens, start-1, current^, line^, lit_result)
+  }
+  else {
+    error(line^, "Failed to parse number literal")
+  }
 }
 
 scanTokens :: proc(source : string, tokens : ^[dynamic]Token) {
@@ -166,7 +202,12 @@ scanTokens :: proc(source : string, tokens : ^[dynamic]Token) {
         line += 1
         break
       case:
-        error(line, "Unexpected character")
+        if isDigit(c) {
+          number_tokenize(source, &current, &line, tokens)
+        }
+        else {
+          error(line, "Unexpected character")
+        }
         break
     }
   }
