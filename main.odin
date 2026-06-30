@@ -49,6 +49,8 @@ Token :: struct {
   line : int
 }
 
+tokens : #soa[dynamic]Token
+
 error :: proc(line : int, message : string) {
   report(line, "", message)
 }
@@ -63,23 +65,21 @@ isDigit :: proc(c : rune) -> bool {
 }
 
 addToken_simple :: proc(token_type : TokenType,
-                        tokens : ^[dynamic]Token,
                         start: int,
                         end: int,
                         line_no: int) {
   token : Token = {token_type, start, end, 0, line_no}
-  append(tokens, token)
+  append(&tokens, token)
   return
 }
 
 addToken_literal :: proc(token_type : TokenType,
-                         tokens : ^[dynamic]Token,
                          start: int,
                          end: int,
                          line_no: int,
                          literal: Literal) {
   token : Token = {token_type, start, end, literal, line_no}
-  append(tokens, token)
+  append(&tokens, token)
   return
 }
 
@@ -114,8 +114,7 @@ match :: proc(expected : rune,
 
 string_tokenize :: proc(source : string,
                         current : ^int,
-                        line : ^int,
-                        tokens : ^[dynamic]Token) {
+                        line : ^int) {
   start : int = current^
   for peek(source, current^) != '"' && !(current^ >= len(source)) {
     if peek(source, current^) == '\n' {
@@ -128,14 +127,13 @@ string_tokenize :: proc(source : string,
     return
   }
   string_lit := transmute(string)source[start:current^]
-  addToken(TokenType.STRING, tokens, start, current^, line^, string_lit)
+  addToken(TokenType.STRING, start, current^, line^, string_lit)
   current^ += 1
 }
 
 number_tokenize :: proc(source : string,
                         current : ^int,
-                        line : ^int,
-                        tokens : ^[dynamic]Token) {
+                        line : ^int) {
   start : int = current^
   for isDigit(peek(source, current^)) {
     current^ += 1
@@ -149,14 +147,14 @@ number_tokenize :: proc(source : string,
   lit_result_length : int
   lit_result, result_ok := strconv.parse_f64(source[start-1:current^], &lit_result_length)
   if result_ok {
-    addToken(TokenType.NUMBER, tokens, start-1, current^, line^, lit_result)
+    addToken(TokenType.NUMBER, start-1, current^, line^, lit_result)
   }
   else {
     error(line^, "Failed to parse number literal")
   }
 }
 
-scanTokens :: proc(source : string, tokens : ^[dynamic]Token) {
+scanTokens :: proc(source : string) {
   current : int = 0
   start : int = 0
   line : int = 1
@@ -164,24 +162,24 @@ scanTokens :: proc(source : string, tokens : ^[dynamic]Token) {
     c := rune(source[current])
     current += 1
     switch c {
-      case '(': addToken(TokenType.LEFT_PAREN, tokens, current, current+1, line)
-      case ')': addToken(TokenType.RIGHT_PAREN, tokens, current, current+1, line)
-      case '{': addToken(TokenType.LEFT_BRACE, tokens, current, current+1, line)
-      case '}': addToken(TokenType.RIGHT_BRACE, tokens, current, current+1, line)
-      case ',': addToken(TokenType.COMMA, tokens, current, current+1, line)
-      case '.': addToken(TokenType.DOT, tokens, current, current+1, line)
-      case '-': addToken(TokenType.MINUS, tokens, current, current+1, line)
-      case '+': addToken(TokenType.PLUS, tokens, current, current+1, line)
-      case ';': addToken(TokenType.SEMICOLON, tokens, current, current+1, line)
-      case '*': addToken(TokenType.STAR, tokens, current, current+1, line)
+      case '(': addToken(TokenType.LEFT_PAREN, current, current+1, line)
+      case ')': addToken(TokenType.RIGHT_PAREN, current, current+1, line)
+      case '{': addToken(TokenType.LEFT_BRACE, current, current+1, line)
+      case '}': addToken(TokenType.RIGHT_BRACE, current, current+1, line)
+      case ',': addToken(TokenType.COMMA, current, current+1, line)
+      case '.': addToken(TokenType.DOT, current, current+1, line)
+      case '-': addToken(TokenType.MINUS, current, current+1, line)
+      case '+': addToken(TokenType.PLUS, current, current+1, line)
+      case ';': addToken(TokenType.SEMICOLON, current, current+1, line)
+      case '*': addToken(TokenType.STAR, current, current+1, line)
       case '!':
-        addToken(TokenType.BANG_EQUAL if match('=', &current, source) else TokenType.BANG, tokens, current, current+1, line)
+        addToken(TokenType.BANG_EQUAL if match('=', &current, source) else TokenType.BANG, current, current+1, line)
       case '=':
-        addToken(TokenType.EQUAL_EQUAL if match('=', &current, source) else TokenType.EQUAL, tokens, current, current+1, line)
+        addToken(TokenType.EQUAL_EQUAL if match('=', &current, source) else TokenType.EQUAL, current, current+1, line)
       case '<':
-        addToken(TokenType.LESS_EQUAL if match('=', &current, source) else TokenType.LESS, tokens, current, current+1, line)
+        addToken(TokenType.LESS_EQUAL if match('=', &current, source) else TokenType.LESS, current, current+1, line)
       case '>':
-        addToken(TokenType.GREATER_EQUAL if match('=', &current, source) else TokenType.GREATER, tokens, current, current+1, line)
+        addToken(TokenType.GREATER_EQUAL if match('=', &current, source) else TokenType.GREATER, current, current+1, line)
       case '/':
         if match('/', &current, source) {
           for peek(source, current) != rune('\n') && !(current >= len(source)) {
@@ -189,10 +187,10 @@ scanTokens :: proc(source : string, tokens : ^[dynamic]Token) {
           }
         }
         else {
-          addToken(TokenType.SLASH, tokens, current, current+1, line)
+          addToken(TokenType.SLASH, current, current+1, line)
         }
       case '"':
-        string_tokenize(source, &current, &line, tokens)
+        string_tokenize(source, &current, &line)
         break
       case ' ':
       case '\r':
@@ -203,7 +201,7 @@ scanTokens :: proc(source : string, tokens : ^[dynamic]Token) {
         break
       case:
         if isDigit(c) {
-          number_tokenize(source, &current, &line, tokens)
+          number_tokenize(source, &current, &line)
         }
         else {
           error(line, "Unexpected character")
@@ -214,8 +212,7 @@ scanTokens :: proc(source : string, tokens : ^[dynamic]Token) {
 }
 
 run :: proc(source : string) {
-  tokens : [dynamic]Token
-  scanTokens(source, &tokens)
+  scanTokens(source)
   for token in tokens {
     fmt.println(token)
   }
