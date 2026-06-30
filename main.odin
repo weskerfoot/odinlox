@@ -223,9 +223,7 @@ run :: proc(source : string) {
 
 runFile :: proc(filename : string) {
   data, err := os.read_entire_file_from_path(filename, context.allocator)
-  if len(data) > 0 {
-    defer delete(data)
-  }
+  defer if len(data) > 0 { delete(data) }
   source := string(data)
   run(source)
 }
