@@ -64,6 +64,16 @@ isDigit :: proc(c : rune) -> bool {
   return c >= '0' && c <= '9'
 }
 
+isAlpha :: proc(c : rune) -> bool {
+  return (c >= 'a' && c <= 'z') ||
+         (c >= 'A' && c <= 'Z') ||
+         c == '_';
+}
+
+isAlphaNumeric :: proc(c : rune) -> bool {
+  return isAlpha(c) || isDigit(c)
+}
+
 addToken_simple :: proc(token_type : TokenType,
                         start: int,
                         end: int,
@@ -154,6 +164,16 @@ number_tokenize :: proc(source : string,
   }
 }
 
+ident_tokenize :: proc(source : string,
+                       current : ^int,
+                       line : ^int) {
+  start : int = current^
+  for isAlphaNumeric(peek(source, current^)) {
+    current^ += 1
+  }
+  addToken(TokenType.IDENTIFIER, start-1, current^, line^)
+}
+
 scanTokens :: proc(source : string) {
   current : int = 0
   start : int = 0
@@ -162,24 +182,24 @@ scanTokens :: proc(source : string) {
     c := rune(source[current])
     current += 1
     switch c {
-      case '(': addToken(TokenType.LEFT_PAREN, current, current+1, line)
-      case ')': addToken(TokenType.RIGHT_PAREN, current, current+1, line)
-      case '{': addToken(TokenType.LEFT_BRACE, current, current+1, line)
-      case '}': addToken(TokenType.RIGHT_BRACE, current, current+1, line)
-      case ',': addToken(TokenType.COMMA, current, current+1, line)
-      case '.': addToken(TokenType.DOT, current, current+1, line)
-      case '-': addToken(TokenType.MINUS, current, current+1, line)
-      case '+': addToken(TokenType.PLUS, current, current+1, line)
-      case ';': addToken(TokenType.SEMICOLON, current, current+1, line)
-      case '*': addToken(TokenType.STAR, current, current+1, line)
+      case '(': addToken(TokenType.LEFT_PAREN, current-1, current, line)
+      case ')': addToken(TokenType.RIGHT_PAREN, current-1, current, line)
+      case '{': addToken(TokenType.LEFT_BRACE, current-1, current, line)
+      case '}': addToken(TokenType.RIGHT_BRACE, current-1, current, line)
+      case ',': addToken(TokenType.COMMA, current-1, current, line)
+      case '.': addToken(TokenType.DOT, current-1, current, line)
+      case '-': addToken(TokenType.MINUS, current-1, current, line)
+      case '+': addToken(TokenType.PLUS, current-1, current, line)
+      case ';': addToken(TokenType.SEMICOLON, current-1, current, line)
+      case '*': addToken(TokenType.STAR, current-1, current, line)
       case '!':
-        addToken(TokenType.BANG_EQUAL if match('=', &current, source) else TokenType.BANG, current, current+1, line)
+        addToken(TokenType.BANG_EQUAL if match('=', &current, source) else TokenType.BANG, current-1, current, line)
       case '=':
-        addToken(TokenType.EQUAL_EQUAL if match('=', &current, source) else TokenType.EQUAL, current, current+1, line)
+        addToken(TokenType.EQUAL_EQUAL if match('=', &current, source) else TokenType.EQUAL, current-1, current, line)
       case '<':
-        addToken(TokenType.LESS_EQUAL if match('=', &current, source) else TokenType.LESS, current, current+1, line)
+        addToken(TokenType.LESS_EQUAL if match('=', &current, source) else TokenType.LESS, current-1, current, line)
       case '>':
-        addToken(TokenType.GREATER_EQUAL if match('=', &current, source) else TokenType.GREATER, current, current+1, line)
+        addToken(TokenType.GREATER_EQUAL if match('=', &current, source) else TokenType.GREATER, current-1, current, line)
       case '/':
         if match('/', &current, source) {
           for peek(source, current) != rune('\n') && !(current >= len(source)) {
@@ -187,7 +207,7 @@ scanTokens :: proc(source : string) {
           }
         }
         else {
-          addToken(TokenType.SLASH, current, current+1, line)
+          addToken(TokenType.SLASH, current-1, current, line)
         }
       case '"':
         string_tokenize(source, &current, &line)
@@ -202,6 +222,9 @@ scanTokens :: proc(source : string) {
       case:
         if isDigit(c) {
           number_tokenize(source, &current, &line)
+        }
+        else if isAlpha(c) {
+          ident_tokenize(source, &current, &line)
         }
         else {
           error(line, "Unexpected character")
@@ -232,6 +255,7 @@ runPrompt :: proc() {
 	for {
     fmt.print("> ")
 		defer free_all(context.temp_allocator)
+    defer clear(&tokens)
 		// read line till \n, note that \n is included in the return
 		line, err := bufio.reader_read_string(&r, '\n', context.temp_allocator)
 		line = strings.trim_right(line, "\r")
