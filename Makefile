@@ -6,7 +6,7 @@ debug:
 
 run:
 	make build
-	./odinbar
+	./odinlox
 
 test:
 	odin test .
