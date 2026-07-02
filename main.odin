@@ -277,24 +277,24 @@ runFile :: proc(filename : string) {
 }
 
 runPrompt :: proc() {
-	r := bufio.Reader{}
-	buffer: [512]byte
-	bufio.reader_init_with_buf(&r, os.to_stream(os.stdin), buffer[:])
-	for {
+  r := bufio.Reader{}
+  buffer: [512]byte
+  bufio.reader_init_with_buf(&r, os.to_stream(os.stdin), buffer[:])
+  for {
     fmt.print("> ")
-		defer free_all(context.temp_allocator)
+    defer free_all(context.temp_allocator)
     defer clear(&tokens)
-		// read line till \n, note that \n is included in the return
-		line, err := bufio.reader_read_string(&r, '\n', context.temp_allocator)
-		line = strings.trim_right(line, "\r")
-		if err != nil {
-			// EOF reached
-			break
-		}
+    // read line till \n, note that \n is included in the return
+    line, err := bufio.reader_read_string(&r, '\n', context.temp_allocator)
+    line = strings.trim_right(line, "\r")
+    if err != nil {
+      // EOF reached
+      break
+    }
     run(line)
     hadError = false
-	}
-	bufio.reader_destroy(&r)
+  }
+  bufio.reader_destroy(&r)
   return
 }
 
