@@ -1,3 +1,4 @@
+#+feature dynamic-literals
 package main
 import "base:runtime"
 import "core:c"
@@ -34,6 +35,25 @@ TokenType :: enum {
   PRINT, RETURN, SUPER, THIS, TRUE, VAR, WHILE,
 
   EOF
+}
+
+keywords := map[string]int{
+  "and" = cast(int)TokenType.AND,
+  "class" = cast(int)TokenType.CLASS,
+  "else" = cast(int)TokenType.ELSE,
+  "false" = cast(int)TokenType.FALSE,
+  "for" = cast(int)TokenType.FOR,
+  "fun" = cast(int)TokenType.FUN,
+  "if"  = cast(int)TokenType.IF,
+  "nil" = cast(int)TokenType.NIL,
+  "or"  = cast(int)TokenType.OR,
+  "print" = cast(int)TokenType.PRINT,
+  "return" = cast(int)TokenType.RETURN,
+  "super" = cast(int)TokenType.SUPER,
+  "this" = cast(int)TokenType.THIS,
+  "true" = cast(int)TokenType.TRUE,
+  "var" = cast(int)TokenType.VAR,
+  "while" = cast(int)TokenType.WHILE
 }
 
 Literal :: union {
@@ -171,7 +191,15 @@ ident_tokenize :: proc(source : string,
   for isAlphaNumeric(peek(source, current^)) {
     current^ += 1
   }
-  addToken(TokenType.IDENTIFIER, start-1, current^, line^)
+
+  ident_lit := transmute(string)source[start-1:current^]
+  keyword_type, keyword_ok := &keywords[ident_lit]
+  if keyword_ok {
+    addToken(cast(TokenType)keyword_type^, start-1, current^, line^)
+  }
+  else {
+    addToken(TokenType.IDENTIFIER, start-1, current^, line^)
+  }
 }
 
 scanTokens :: proc(source : string) {
